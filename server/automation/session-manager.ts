@@ -4,13 +4,14 @@ import { logger } from '../logger/logger';
 
 const GOOGLE_ACCOUNTS_URL = 'https://accounts.google.com';
 const GOOGLE_FLOW_URL = 'https://labs.google/fx/tools/flow';
+const GOOGLE_VALIDATION_URL = 'https://myaccount.google.com';
 
 export class SessionManager {
   private sessionValid: boolean = false;
 
   /**
-   * Check if the user is logged into Google by navigating to the Flow page
-   * and checking if we're redirected to a login page.
+   * Check if the user is logged into Google by navigating to a lightweight page
+   * and checking if we are redirected to a login screen.
    */
   async validateSession(): Promise<boolean> {
     if (!browserManager.isConnected()) {
@@ -21,13 +22,15 @@ export class SessionManager {
     try {
       const page = await browserManager.getPage();
 
-      // Navigate to Google Flow
-      await page.goto(GOOGLE_FLOW_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(3000);
+      // Navigate to lightweight Google account page
+      logger.info('Validating Google login session...', { action: 'session_validate' });
+      await page.goto(GOOGLE_VALIDATION_URL, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      await page.waitForTimeout(2000);
 
-      // Check if we're on the Flow page or redirected to login
+      // Check if we are on the account page or redirected to sign-in page
       const currentUrl = page.url();
       const isLoggedIn =
+        currentUrl.includes('myaccount.google.com') &&
         !currentUrl.includes('accounts.google.com/v3/signin') &&
         !currentUrl.includes('accounts.google.com/ServiceLogin') &&
         !currentUrl.includes('accounts.google.com/signin');
@@ -37,9 +40,9 @@ export class SessionManager {
       this.sessionValid = isLoggedIn;
 
       if (isLoggedIn) {
-        logger.info('Google session is valid', { action: 'session_validate' });
+        logger.info('Google session verified: Logged in successfully', { action: 'session_validate' });
       } else {
-        logger.warn('Google session expired - user needs to log in', {
+        logger.warn('Google session invalid: Redirected to sign-in page', {
           action: 'session_validate',
         });
       }
