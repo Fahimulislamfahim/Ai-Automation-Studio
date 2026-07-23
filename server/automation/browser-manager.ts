@@ -29,18 +29,35 @@ export class BrowserManager {
     if (options.autoRestart !== undefined) this.autoRestart = options.autoRestart;
   }
 
+  private launchPromise: Promise<BrowserContext> | null = null;
+
   /**
    * Launch a persistent browser context.
    * This reuses the same user data directory so Google login is preserved.
    */
   async launch(): Promise<BrowserContext> {
     if (this.context) {
-      logger.info('Browser already running, reusing existing context', {
-        action: 'browser_launch',
-      });
       return this.context;
     }
 
+    if (this.launchPromise) {
+      logger.info('Browser launch already in progress, awaiting existing launch...', {
+        action: 'browser_launch',
+      });
+      return this.launchPromise;
+    }
+
+    this.launchPromise = this.performLaunch();
+
+    try {
+      const context = await this.launchPromise;
+      return context;
+    } finally {
+      this.launchPromise = null;
+    }
+  }
+
+  private async performLaunch(retryCount = 0): Promise<BrowserContext> {
     logger.info('Launching browser...', { action: 'browser_launch' });
 
     try {
@@ -77,6 +94,19 @@ export class BrowserManager {
       return this.context;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      
+      // If profile is locked and we haven't retried yet, wait 2s and try again
+      if (
+        (message.includes('existing browser session') || message.includes('profile is already in use')) &&
+        retryCount < 2
+      ) {
+        logger.warn(`Browser profile locked (attempt ${retryCount + 1}). Retrying in 2s...`, {
+          action: 'browser_launch_retry',
+        });
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return this.performLaunch(retryCount + 1);
+      }
+
       logger.error(`Failed to launch browser: ${message}`, { action: 'browser_launch' });
       throw error;
     }
