@@ -25,15 +25,60 @@ export class GoogleFlowProvider implements AIProvider {
 
   async openImageGenerator(page: Page): Promise<void> {
     logger.info('Opening Google Flow...', { action: 'open_image_generator' });
-    await page.goto(FLOW_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(3000);
+    await page.goto(FLOW_URL, { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForTimeout(4000);
 
-    // Wait for the page to be fully loaded
-    await page.waitForLoadState('networkidle').catch(() => {
-      // networkidle can timeout on dynamic pages, continue anyway
-    });
+    // 1. Dismiss "Cookie banner" or other initial overlay popups if they exist
+    const cookieConsentBtn = page.locator('button:has-text("Accept all"), button:has-text("I agree"), button:has-text("Agree"), button:has-text("Accept")').first();
+    if (await cookieConsentBtn.isVisible().catch(() => false)) {
+      logger.info('Clicking cookie/agreement consent...', { action: 'navigation' });
+      await cookieConsentBtn.click();
+      await page.waitForTimeout(2000);
+    }
 
-    logger.info('Google Flow loaded', { action: 'open_image_generator' });
+    // 2. Check for "Create with Google Flow" / "Try Flow" / "Get started" button
+    const getStartedBtn = page.locator('a, button, [role="button"]').filter({ 
+      hasText: /Create with Google Flow|Try Flow|Get Started|Launch Flow/i 
+    }).first();
+
+    if (await getStartedBtn.isVisible().catch(() => false)) {
+      logger.info('Clicking "Create with Google Flow" button...', { action: 'navigation' });
+      await getStartedBtn.click();
+      await page.waitForTimeout(4000);
+    }
+
+    // 3. Dismiss onboarding/welcome popups if visible
+    // They can sometimes be dismissed by clicking "Got it", "Get started", or clicking outside
+    const gotItBtn = page.locator('button, [role="button"]').filter({ 
+      hasText: /Got it|Get started|Dismiss|Close|Next|Skip/i 
+    }).first();
+
+    if (await gotItBtn.isVisible().catch(() => false)) {
+      logger.info('Dismissing onboarding pop-up dialog...', { action: 'navigation' });
+      await gotItBtn.click();
+      await page.waitForTimeout(2000);
+    } else {
+      // Tap outside (10, 10) to dismiss backdrop modal if it is locking the screen
+      const overlay = page.locator('.modal-backdrop, .overlay, [class*="overlay" i], [class*="backdrop" i]').first();
+      if (await overlay.isVisible().catch(() => false)) {
+        logger.info('Clicking backdrop to close overlay dialog...', { action: 'navigation' });
+        await page.mouse.click(10, 10);
+        await page.waitForTimeout(2000);
+      }
+    }
+
+    // 4. Click "Create new project" or "New project"
+    const newProjectBtn = page.locator('button, [role="button"]').filter({ 
+      hasText: /Create new project|New project|New Project|Create project/i 
+    }).first();
+
+    if (await newProjectBtn.isVisible().catch(() => false)) {
+      logger.info('Clicking "Create new project" button...', { action: 'navigation' });
+      await newProjectBtn.click();
+      await page.waitForTimeout(4000);
+    }
+
+    logger.info('Google Flow workspace ready', { action: 'open_image_generator' });
   }
 
   async uploadImage(page: Page, imagePath: string): Promise<void> {
