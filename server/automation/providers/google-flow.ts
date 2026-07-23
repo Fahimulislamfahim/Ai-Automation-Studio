@@ -84,10 +84,16 @@ export class GoogleFlowProvider implements AIProvider {
 
         if (newPage) {
           logger.info('Detected new tab opened for project workspace', { action: 'navigation' });
-          await newPage.waitForLoadState('domcontentloaded').catch(() => {});
-          const projectUrl = newPage.url();
           
-          logger.info(`Closing spawned tab and redirecting primary tab to: ${projectUrl}`, { action: 'navigation' });
+          // Wait for the new tab to navigate to the project page (URL contains /project/)
+          await newPage.waitForURL(/.*\/project\/.*/, { timeout: 12000 }).catch(() => {
+            logger.warn('New tab URL did not redirect to project URL within timeout', { action: 'navigation' });
+          });
+          
+          const projectUrl = newPage.url();
+          logger.info(`Project URL resolved: ${projectUrl}`, { action: 'navigation' });
+          
+          logger.info('Closing spawned tab and redirecting primary tab to project URL...', { action: 'navigation' });
           await newPage.close().catch(() => {});
           
           if (projectUrl && projectUrl !== 'about:blank') {
@@ -127,8 +133,8 @@ export class GoogleFlowProvider implements AIProvider {
 
     // Wait for the uploaded image card with the filename to appear in the workspace
     logger.info(`Waiting for uploaded image card to appear in workspace: ${fileName}`, { action: 'upload_image' });
-    const imageCardText = page.locator(`text="${fileName}"`).first();
-    await imageCardText.waitFor({ state: 'visible', timeout: 35000 });
+    const imageCardText = page.getByText(fileName, { exact: false }).first();
+    await imageCardText.waitFor({ state: 'visible', timeout: 45000 });
 
     // Click the uploaded image card to open the editor edit screen
     logger.info(`Clicking uploaded image card: ${fileName}`, { action: 'upload_image' });
