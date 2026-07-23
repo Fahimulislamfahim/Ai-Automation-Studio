@@ -74,8 +74,33 @@ export class GoogleFlowProvider implements AIProvider {
 
     if (await newProjectBtn.isVisible().catch(() => false)) {
       logger.info('Clicking "Create new project" button...', { action: 'navigation' });
-      await newProjectBtn.click();
-      await page.waitForTimeout(4000);
+      
+      try {
+        // Intercept new page event if button opens a new tab
+        const [newPage] = await Promise.all([
+          page.context().waitForEvent('page', { timeout: 8000 }).catch(() => null),
+          newProjectBtn.click()
+        ]);
+
+        if (newPage) {
+          logger.info('Detected new tab opened for project workspace', { action: 'navigation' });
+          await newPage.waitForLoadState('domcontentloaded').catch(() => {});
+          const projectUrl = newPage.url();
+          
+          logger.info(`Closing spawned tab and redirecting primary tab to: ${projectUrl}`, { action: 'navigation' });
+          await newPage.close().catch(() => {});
+          
+          if (projectUrl && projectUrl !== 'about:blank') {
+            await page.goto(projectUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          }
+        } else {
+          // If no new tab opened, it redirected the same tab
+          await page.waitForTimeout(4000);
+        }
+      } catch (err) {
+        logger.warn('Project creation tab intercept timed out, checking current URL', { action: 'navigation' });
+        await page.waitForTimeout(4000);
+      }
     }
 
     logger.info('Google Flow workspace ready', { action: 'open_image_generator' });
@@ -84,21 +109,18 @@ export class GoogleFlowProvider implements AIProvider {
   async uploadImage(page: Page, imagePath: string): Promise<void> {
     logger.info(`Uploading image: ${path.basename(imagePath)}`, { action: 'upload_image' });
 
-    // Look for file input or upload button
-    // Google Flow typically has an upload area or file input
-    const fileInput = await page.locator('input[type="file"]').first();
-
-    if (await fileInput.isVisible().catch(() => false)) {
+    try {
+      // Wait for file input to be attached to the DOM (up to 15 seconds)
+      const fileInput = page.locator('input[type="file"]').first();
+      await fileInput.waitFor({ state: 'attached', timeout: 15000 });
       await fileInput.setInputFiles(imagePath);
-    } else {
-      // Try to find a hidden file input and set files directly
-      const inputs = page.locator('input[type="file"]');
-      const count = await inputs.count();
-
-      if (count > 0) {
-        await inputs.first().setInputFiles(imagePath);
+    } catch (error) {
+      // Fallback: try setting it directly if it exists, otherwise throw descriptive error
+      const fileInput = page.locator('input[type="file"]').first();
+      if ((await fileInput.count()) > 0) {
+        await fileInput.setInputFiles(imagePath);
       } else {
-        throw new Error('Could not find file upload input on the page');
+        throw new Error('Could not find file upload input on the page. Please check if you are inside the editor.');
       }
     }
 

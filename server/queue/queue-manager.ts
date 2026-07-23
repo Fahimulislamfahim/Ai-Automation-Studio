@@ -315,6 +315,37 @@ export class QueueManager {
    * Retry a specific failed job
    */
   async retryJob(jobId: string): Promise<void> {
+    const job = await prisma.job.findUnique({ where: { id: jobId } });
+    if (!job) return;
+
+    // Check if the original watched image still exists
+    const fs = require('fs');
+    if (!fs.existsSync(job.filePath)) {
+      // Find where it could have been moved (failed or completed folder)
+      const failedFolderSetting = await prisma.setting.findUnique({ where: { key: 'failedFolder' } });
+      const completedFolderSetting = await prisma.setting.findUnique({ where: { key: 'completedFolder' } });
+      
+      const failedFolder = resolvePath(failedFolderSetting?.value || DEFAULT_SETTINGS.failedFolder);
+      const completedFolder = resolvePath(completedFolderSetting?.value || DEFAULT_SETTINGS.completedFolder);
+
+      const failedPath = path.join(failedFolder, job.fileName);
+      const completedPath = path.join(completedFolder, job.fileName);
+
+      if (fs.existsSync(failedPath)) {
+        logger.info(`Restoring image from failed folder back to input: ${job.fileName}`, {
+          action: 'job_retry',
+          jobId,
+        });
+        await moveFile(failedPath, job.filePath);
+      } else if (fs.existsSync(completedPath)) {
+        logger.info(`Restoring image from completed folder back to input: ${job.fileName}`, {
+          action: 'job_retry',
+          jobId,
+        });
+        await moveFile(completedPath, job.filePath);
+      }
+    }
+
     await prisma.job.update({
       where: { id: jobId },
       data: { status: 'retrying', retryCount: 0, errorMessage: null, progress: 0 },
