@@ -171,10 +171,10 @@ export class GoogleFlowProvider implements AIProvider {
 
     // Wait for a download button, generated image, or other indicator of completion
     while (Date.now() - startTime < timeout) {
-      // Check for download button or generated content
+      // Check for download button or generated content in workspace/editor
       const downloadBtn = page.locator(
-        'button:has-text("Download"), button[aria-label*="download" i], a[download]'
-      );
+        'main button:has-text("Download"), [class*="editor" i] button:has-text("Download"), [class*="workspace" i] button:has-text("Download"), button[aria-label*="download" i]'
+      ).last();
       const generatedImage = page.locator('img[src*="generated"], img[src*="blob:"]');
 
       if (
@@ -185,11 +185,13 @@ export class GoogleFlowProvider implements AIProvider {
         return;
       }
 
-      // Check for errors
-      const errorElement = page.locator('[class*="error" i], [role="alert"]');
-      if ((await errorElement.count()) > 0) {
-        const errorText = await errorElement.first().textContent();
-        throw new Error(`Generation failed: ${errorText}`);
+      // Check for real errors, ignoring toast alerts or status messages
+      const errorElement = page.locator('[class*="error-message" i], [class*="error_message" i], .error-text, .error, [role="alert"]').first();
+      if (await errorElement.isVisible().catch(() => false)) {
+        const errorText = await errorElement.textContent();
+        if (errorText && /fail|error|unable|could not|blocked|denied|invalid/i.test(errorText)) {
+          throw new Error(`Generation failed: ${errorText}`);
+        }
       }
 
       await page.waitForTimeout(3000);
@@ -201,16 +203,20 @@ export class GoogleFlowProvider implements AIProvider {
   async downloadGeneratedImage(page: Page, outputDir: string): Promise<string> {
     logger.info('Downloading generated image...', { action: 'download_image' });
 
+    // Target the download button specifically inside the workspace/editor (excluding header/nav candidate buttons)
+    let downloadBtn = page.locator(
+      'main button:has-text("Download"), [class*="editor" i] button:has-text("Download"), [class*="workspace" i] button:has-text("Download")'
+    ).last();
+
+    if ((await downloadBtn.count()) === 0) {
+      // Fallback to last download button on page
+      downloadBtn = page.locator('button:has-text("Download"), button[aria-label*="download" i], a[download]').last();
+    }
+
     // Set up download listener
     const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 30000 }),
-      // Click download button
-      page
-        .locator(
-          'button:has-text("Download"), button[aria-label*="download" i], a[download]'
-        )
-        .first()
-        .click(),
+      page.waitForEvent('download', { timeout: 35000 }),
+      downloadBtn.click(),
     ]);
 
     // Save the downloaded file
@@ -261,8 +267,8 @@ export class GoogleFlowProvider implements AIProvider {
       // Check for video element or download button
       const videoElement = page.locator('video[src], video source[src]');
       const downloadBtn = page.locator(
-        'button:has-text("Download"), button[aria-label*="download" i], a[download]'
-      );
+        'main button:has-text("Download"), [class*="editor" i] button:has-text("Download"), [class*="workspace" i] button:has-text("Download"), button[aria-label*="download" i]'
+      ).last();
 
       if (
         (await videoElement.count()) > 0 ||
@@ -272,11 +278,13 @@ export class GoogleFlowProvider implements AIProvider {
         return;
       }
 
-      // Check for errors
-      const errorElement = page.locator('[class*="error" i], [role="alert"]');
-      if ((await errorElement.count()) > 0) {
-        const errorText = await errorElement.first().textContent();
-        throw new Error(`Video generation failed: ${errorText}`);
+      // Check for real errors, ignoring status alerts/messages
+      const errorElement = page.locator('[class*="error-message" i], [class*="error_message" i], .error-text, .error, [role="alert"]').first();
+      if (await errorElement.isVisible().catch(() => false)) {
+        const errorText = await errorElement.textContent();
+        if (errorText && /fail|error|unable|could not|blocked|denied|invalid/i.test(errorText)) {
+          throw new Error(`Video generation failed: ${errorText}`);
+        }
       }
 
       await page.waitForTimeout(5000);
@@ -288,14 +296,18 @@ export class GoogleFlowProvider implements AIProvider {
   async downloadGeneratedVideo(page: Page, outputDir: string): Promise<string> {
     logger.info('Downloading generated video...', { action: 'download_video' });
 
+    // Target the download button specifically inside the workspace/editor
+    let downloadBtn = page.locator(
+      'main button:has-text("Download"), [class*="editor" i] button:has-text("Download"), [class*="workspace" i] button:has-text("Download")'
+    ).last();
+
+    if ((await downloadBtn.count()) === 0) {
+      downloadBtn = page.locator('button:has-text("Download"), button[aria-label*="download" i], a[download]').last();
+    }
+
     const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 60000 }),
-      page
-        .locator(
-          'button:has-text("Download"), button[aria-label*="download" i], a[download]'
-        )
-        .first()
-        .click(),
+      page.waitForEvent('download', { timeout: 65000 }),
+      downloadBtn.click(),
     ]);
 
     const suggestedName = download.suggestedFilename() || `generated_${Date.now()}.mp4`;
