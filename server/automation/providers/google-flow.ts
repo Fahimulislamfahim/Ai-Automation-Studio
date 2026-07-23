@@ -107,7 +107,8 @@ export class GoogleFlowProvider implements AIProvider {
   }
 
   async uploadImage(page: Page, imagePath: string): Promise<void> {
-    logger.info(`Uploading image: ${path.basename(imagePath)}`, { action: 'upload_image' });
+    const fileName = path.basename(imagePath);
+    logger.info(`Uploading image: ${fileName}`, { action: 'upload_image' });
 
     try {
       // Wait for file input to be attached to the DOM (up to 15 seconds)
@@ -124,16 +125,30 @@ export class GoogleFlowProvider implements AIProvider {
       }
     }
 
-    // Wait for upload to complete
-    await page.waitForTimeout(3000);
-    logger.info('Image uploaded', { action: 'upload_image' });
+    // Wait for the uploaded image card with the filename to appear in the workspace
+    logger.info(`Waiting for uploaded image card to appear in workspace: ${fileName}`, { action: 'upload_image' });
+    const imageCardText = page.locator(`text="${fileName}"`).first();
+    await imageCardText.waitFor({ state: 'visible', timeout: 35000 });
+
+    // Click the uploaded image card to open the editor edit screen
+    logger.info(`Clicking uploaded image card: ${fileName}`, { action: 'upload_image' });
+    await imageCardText.click();
+
+    // Wait for the URL redirection to /edit/
+    logger.info('Waiting for redirect to edit workspace...', { action: 'upload_image' });
+    await page.waitForURL(/.*\/edit\/.*/, { timeout: 15000 }).catch(() => {
+      logger.warn('URL redirect to edit page did not complete, continuing anyway', { action: 'upload_image' });
+    });
+
+    await page.waitForTimeout(2000);
+    logger.info('Image uploaded and editor workspace opened', { action: 'upload_image' });
   }
 
   async submitImagePrompt(page: Page, prompt: string): Promise<void> {
     logger.info('Submitting image prompt...', { action: 'submit_prompt' });
 
-    // Look for text input / textarea for the prompt
-    const promptInput = page.locator('textarea, input[type="text"]').first();
+    // Look for text input / textarea for the change prompt (second screenshot: 'What do you want to change?')
+    const promptInput = page.locator('textarea[placeholder*="want to change" i], [placeholder*="want to change" i], textarea, input[type="text"]').first();
 
     if (await promptInput.isVisible().catch(() => false)) {
       await promptInput.click();
@@ -144,20 +159,22 @@ export class GoogleFlowProvider implements AIProvider {
       if (await editableDiv.isVisible().catch(() => false)) {
         await editableDiv.click();
         await editableDiv.fill(prompt);
+      } else {
+        throw new Error('Could not find prompt input field "What do you want to change?" on the edit page');
       }
     }
 
     await page.waitForTimeout(1000);
 
-    // Look for generate/submit button
-    const generateBtn = page.locator(
-      'button:has-text("Generate"), button:has-text("Create"), button:has-text("Submit"), button[aria-label*="generate" i], button[aria-label*="submit" i]'
-    ).first();
+    // Look for generate/submit button next to the textarea or the arrow submit button
+    const submitBtn = page.locator('textarea[placeholder*="want to change" i] ~ button, [placeholder*="want to change" i] + button, button:has(svg)').first();
 
-    if (await generateBtn.isVisible().catch(() => false)) {
-      await generateBtn.click();
+    if (await submitBtn.isVisible().catch(() => false)) {
+      logger.info('Clicking prompt submit arrow button...', { action: 'submit_prompt' });
+      await submitBtn.click();
     } else {
       // Try pressing Enter
+      logger.info('Submit button not found, pressing Enter to submit...', { action: 'submit_prompt' });
       await page.keyboard.press('Enter');
     }
 
