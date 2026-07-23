@@ -49,4 +49,7 @@ export interface AIProvider {
 
   /** Download the generated video */
   downloadGeneratedVideo(page: Page, outputDir: string): Promise<string>;
+
+  /** Optional: Add the generated image back to prompt (Google Flow specific workflow) */
+  addGeneratedImageToPrompt?(page: Page): Promise<void>;
 }

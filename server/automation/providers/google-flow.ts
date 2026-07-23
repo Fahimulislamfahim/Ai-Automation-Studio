@@ -334,6 +334,37 @@ export class GoogleFlowProvider implements AIProvider {
     logger.info(`Video downloaded: ${suggestedName}`, { action: 'download_video' });
     return outputPath;
   }
+
+  async addGeneratedImageToPrompt(page: Page): Promise<void> {
+    logger.info('Starting "Add to Prompt" workflow...', { action: 'add_to_prompt' });
+
+    // 1. Click back button to return to project dashboard (first screenshot)
+    const backBtn = page.locator('button:has(svg), [aria-label*="back" i], button[class*="back" i], .back-button').first();
+    logger.info('Clicking back button to return to project media dashboard...', { action: 'add_to_prompt' });
+    await backBtn.click();
+    
+    // Wait for the URL to change back to project root dashboard (which doesn't contain /edit/)
+    await page.waitForURL(url => !url.href.includes('/edit/'), { timeout: 15000 }).catch(() => {
+      logger.warn('URL redirect back to project root did not complete, proceeding...', { action: 'add_to_prompt' });
+    });
+    await page.waitForTimeout(3000);
+
+    // 2. Right click on the newly generated image (second screenshot)
+    // The newly generated image will be the first item in the grid container
+    const firstImage = page.locator('[class*="grid" i] img, [class*="card" i] img, [class*="media" i] img, img').first();
+    logger.info('Right-clicking on the generated image card...', { action: 'add_to_prompt' });
+    await firstImage.click({ button: 'right' });
+    await page.waitForTimeout(2000);
+
+    // 3. Select "Add to prompt" from the context menu (third screenshot)
+    const addToPromptBtn = page.locator('text="Add to prompt", [role="menuitem"]:has-text("Add to prompt"), button:has-text("Add to prompt")').first();
+    await addToPromptBtn.waitFor({ state: 'visible', timeout: 8000 });
+    logger.info('Clicking "Add to prompt" in the context menu...', { action: 'add_to_prompt' });
+    await addToPromptBtn.click();
+    await page.waitForTimeout(3000);
+
+    logger.info('"Add to Prompt" workflow completed successfully', { action: 'add_to_prompt' });
+  }
 }
 
 export const googleFlowProvider = new GoogleFlowProvider();

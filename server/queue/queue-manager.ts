@@ -166,6 +166,11 @@ export class QueueManager {
           jobId: job.id,
         });
 
+        // Add generated image to prompt (Google Flow workflow modification)
+        if (typeof this.provider.addGeneratedImageToPrompt === 'function') {
+          await this.provider.addGeneratedImageToPrompt(page);
+        }
+
         // --- STEP 2: VIDEO GENERATION ---
         await this.updateJob(job.id, { stage: 'generating_video', progress: 60 });
 
