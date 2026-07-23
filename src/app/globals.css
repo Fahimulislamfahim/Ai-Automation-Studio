@@ -1,26 +1,121 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Brand colors */
+  --color-brand-50: oklch(0.97 0.02 240);
+  --color-brand-100: oklch(0.93 0.04 240);
+  --color-brand-200: oklch(0.87 0.08 240);
+  --color-brand-300: oklch(0.78 0.12 240);
+  --color-brand-400: oklch(0.68 0.18 240);
+  --color-brand-500: oklch(0.58 0.22 240);
+  --color-brand-600: oklch(0.50 0.20 240);
+  --color-brand-700: oklch(0.42 0.16 240);
+
+  /* Surface colors */
+  --color-surface-0: oklch(0.13 0.005 260);
+  --color-surface-1: oklch(0.16 0.006 260);
+  --color-surface-2: oklch(0.19 0.008 260);
+  --color-surface-3: oklch(0.22 0.010 260);
+  --color-surface-4: oklch(0.26 0.012 260);
+
+  /* Accent glow */
+  --color-glow-cyan: oklch(0.78 0.18 195);
+  --color-glow-purple: oklch(0.65 0.25 300);
+  --color-glow-emerald: oklch(0.75 0.18 160);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+@layer base {
+  * {
+    border-color: oklch(0.30 0.01 260);
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  body {
+    background-color: var(--color-surface-0);
+    color: oklch(0.90 0.01 260);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.35 0.01 260);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.45 0.01 260);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .glass-card {
+    background: oklch(0.16 0.006 260 / 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid oklch(0.30 0.01 260 / 0.5);
+    border-radius: 16px;
+  }
+
+  .glass-card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glass-card-hover:hover {
+    background: oklch(0.19 0.008 260 / 0.9);
+    border-color: oklch(0.40 0.02 260 / 0.5);
+    box-shadow: 0 0 30px oklch(0.58 0.22 240 / 0.08);
+  }
+
+  .status-glow {
+    box-shadow: 0 0 20px currentColor;
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, var(--color-glow-cyan), var(--color-glow-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .progress-bar {
+    background: linear-gradient(90deg, var(--color-glow-cyan), var(--color-brand-500), var(--color-glow-purple));
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }

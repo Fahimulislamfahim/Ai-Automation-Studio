@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "./dist"
+  },
+  "include": ["server/**/*.ts", "src/types/**/*.ts"],
+  "exclude": ["node_modules", "src/app", "src/components"]
+}

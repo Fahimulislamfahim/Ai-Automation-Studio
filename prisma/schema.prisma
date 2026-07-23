@@ -1,0 +1,52 @@
+// Prisma schema for AI Automation Studio
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Job {
+  id             String    @id @default(uuid())
+  fileName       String
+  filePath       String
+  status         String    @default("pending")
+  stage          String?
+  progress       Int       @default(0)
+  retryCount     Int       @default(0)
+  maxRetries     Int       @default(3)
+  errorMessage   String?
+  generatedImage String?
+  generatedVideo String?
+  processingTime Int?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  logs           Log[]
+}
+
+model Log {
+  id        String   @id @default(uuid())
+  jobId     String?
+  job       Job?     @relation(fields: [jobId], references: [id])
+  level     String
+  action    String
+  message   String
+  metadata  String?
+  duration  Int?
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+  @@index([createdAt])
+  @@index([level])
+}
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
